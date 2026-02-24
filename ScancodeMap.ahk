@@ -25,7 +25,7 @@ class VersionManager_ScancodeMap
     static _ := VersionManager_ScancodeMap._init()
     _init()    {
         global
-        SCANCODEMAP_VERSION := "1.0.0"
+        SCANCODEMAP_VERSION := "1.0.1"
         if (!this._verCheck(EVENT_VERSION, "1.0.0"))
             throw exception("Event version 1.x is required (minimum 1.0.0).")
         if (!this._verCheck(WAITFORSINGLEOBJECTASYNC_VERSION, "1.0.0"))
@@ -73,19 +73,19 @@ class ScancodeMap
         return result
     }
     ;--------------------------------
-    static _handles := {event:"", waitFunc:"", hKey:""}
+    static _handles := {event:"", waitFunc:"", hKey:0}
+        ,_hasRegCallback := false
         ,_objbmCloseRegistryKeysOnExit  := objBindMethod(ScancodeMap, "_closeRegistryKeysOnExit")
         ,_objbmChangedCallback          := objBindMethod(ScancodeMap, "_changedCallback")
         ,_userCallbacks := []
         
     onChanged(callback, addRemove := 1)    { ;  Handle callbacks as succinctly as possible.
-        static hasRegCallback := false
-            ,HKEY_LOCAL_MACHINE         := 0x80000002
+        static HKEY_LOCAL_MACHINE       := 0x80000002
             ,KEY_NOTIFY                 := 0x0010
             ,ERROR_SUCCESS              := 0
             ,REG_NOTIFY_CHANGE_LAST_SET := 0x00000004
         critical % format("{2}", prevIC := A_IsCritical, "On")
-        if (!hasRegCallback)    {
+        if (!this._hasRegCallback)    {
             onExit(this._objbmCloseRegistryKeysOnExit)
             loop 1    {
                 this._handles.event := new Event()
@@ -96,15 +96,18 @@ class ScancodeMap
                 this._handles.waitFunc := new WaitForSingleObjectAsync(this._handles.event.handle, this._objbmChangedCallback)
                 lErrorCode := dllCall("Advapi32.dll\RegOpenKeyEx", "Ptr",HKEY_LOCAL_MACHINE, "Str","SYSTEM\CurrentControlSet\Control\Keyboard Layout", "UInt",0, "UInt",KEY_NOTIFY, "Ptr*",hKey, "Int")
                 if (lErrorCode !== ERROR_SUCCESS)    {
-                    this._handles.waitFunc  := ""
-                    this._handles.event     := ""
+                    this._resetHandles()
                     break
                 }
                 this._handles.hKey := hKey
-                dllCall("Advapi32.dll\RegNotifyChangeKeyValue", "Ptr",this._handles.hKey, "Int",false, "UInt",REG_NOTIFY_CHANGE_LAST_SET, "Ptr",this._handles.event.handle, "Int",true, "Int")
-                hasRegCallback := true
+                lErrorCode := dllCall("Advapi32.dll\RegNotifyChangeKeyValue", "Ptr",this._handles.hKey, "Int",false, "UInt",REG_NOTIFY_CHANGE_LAST_SET, "Ptr",this._handles.event.handle, "Int",true, "Int")
+                if (lErrorCode !== ERROR_SUCCESS)    {
+                    this._resetHandles()
+                    break
+                }
+                this._hasRegCallback := true
             }
-            if (!hasRegCallback)    {
+            if (!this._hasRegCallback)    {
                 critical % prevIC
                 return
             }
@@ -132,27 +135,33 @@ class ScancodeMap
         }
         this._userCallbacks := newList
         if (!this._userCallbacks.length())    {
-            if (this._handles.hKey)
-                dllCall("Advapi32.dll\RegCloseKey", "Ptr",this._handles.hKey, "Int")
-            this._handles.waitFunc  := ""
-            this._handles.event     := ""
-            hasRegCallback := false
+            this._resetHandles()
+            this._hasRegCallback := false
         }
         critical % prevIC
     }
+    _resetHandles()    {
+        if (this._handles.hKey)
+            dllCall("Advapi32.dll\RegCloseKey", "Ptr",this._handles.hKey, "Int")
+        this._handles.hKey := 0
+        this._handles.waitFunc  := ""
+        this._handles.event     := ""
+    }
     _changedCallback()    {
-        static REG_NOTIFY_CHANGE_LAST_SET := 0x00000004
+        static ERROR_SUCCESS            := 0
+            ,REG_NOTIFY_CHANGE_LAST_SET := 0x00000004
         if (this._userCallbacks.length())    {
             for _, fn in this._userCallbacks
                 if (fn.call())
                     break
         }
-        dllCall("Advapi32.dll\RegNotifyChangeKeyValue", "Ptr",this._handles.hKey, "Int",false, "UInt",REG_NOTIFY_CHANGE_LAST_SET, "Ptr",this._handles.event.handle, "Int",true, "Int")
+        lErrorCode := dllCall("Advapi32.dll\RegNotifyChangeKeyValue", "Ptr",this._handles.hKey, "Int",false, "UInt",REG_NOTIFY_CHANGE_LAST_SET, "Ptr",this._handles.event.handle, "Int",true, "Int")
+        if (lErrorCode !== ERROR_SUCCESS)    {
+            this._resetHandles()
+            this._hasRegCallback := false
+        }
     }
     _closeRegistryKeysOnExit(exitReason, exitCode)    {
-        if (this._handles.hKey)
-            dllCall("Advapi32.dll\RegCloseKey", "Ptr",this._handles.hKey, "Int")
-        this._handles.waitFunc  := ""
-        this._handles.event     := ""
+        this._resetHandles()
     }
 }
