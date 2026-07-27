@@ -25,7 +25,7 @@ class VersionManager_ScancodeMap
     static _ := VersionManager_ScancodeMap._init()
     _init()    {
         global
-        SCANCODEMAP_VERSION := "1.0.1"
+        SCANCODEMAP_VERSION := "1.0.2"
         if (!this._verCheck(EVENT_VERSION, "1.0.0"))
             throw exception("Event version 1.x is required (minimum 1.0.0).")
         if (!this._verCheck(WAITFORSINGLEOBJECTASYNC_VERSION, "1.0.0"))
@@ -46,20 +46,39 @@ class ScancodeMap
 {
     static _keyName:="HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Keyboard Layout"
     read()    {
-        regRead value, % this._keyName, % "Scancode Map"
-        return (!errorLevel?value:"")
+        try  {
+            regRead value, % this._keyName, % "Scancode Map"
+        }  catch  {
+            value := ""
+        }
+        return value
     }
     exist(ByRef value:="")    {
-        regRead value, % this._keyName, % "Scancode Map"
-        return (!errorLevel)
+        ok := true
+        try  {
+            regRead value, % this._keyName, % "Scancode Map"
+        }  catch  {
+            ok := false 
+        }
+        return ok
     }
     write(value)    {
-        regWrite % "REG_BINARY", % this._keyName, % "Scancode Map", % value
-        return (!errorLevel)
+        ok := true
+        try  {
+            regWrite % "REG_BINARY", % this._keyName, % "Scancode Map", % value
+        }  catch  {
+            ok := false
+        }
+        return ok
     }
     delete()    {
-        regDelete % this._keyName, % "Scancode Map"
-        return (!errorLevel)
+        ok := true
+        try  {
+            regDelete % this._keyName, % "Scancode Map"
+        }  catch  {
+            ok := false
+        }
+        return ok
     }
     ;--------------------------------
     getList(mapData := "")    {
