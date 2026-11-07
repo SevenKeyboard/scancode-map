@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Version>2.0.0</Version>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsAotCompatible>true</IsAotCompatible>
+    <OnRegKeyLocalNotifyProjectPath Condition="'$(OnRegKeyLocalNotifyProjectPath)' == ''">$(MSBuildThisFileDirectory)../../../../on-reg-key-local-notify/main-cs/src/SevenKeyboard.OnRegKeyLocalNotify/SevenKeyboard.OnRegKeyLocalNotify.csproj</OnRegKeyLocalNotifyProjectPath>
+    <LibraryBuildTargetsPath Condition="'$(LibraryBuildTargetsPath)' == ''">$(MSBuildThisFileDirectory)../../../../library-build/main-cs/CheckLibraryVersions.targets</LibraryBuildTargetsPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(OnRegKeyLocalNotifyProjectPath)" MinimumVersion="2.0.0" />
+    <InternalsVisibleTo Include="ScancodeMap.Smoke" />
+  </ItemGroup>
+  <Import Project="$(LibraryBuildTargetsPath)" />
+</Project>
